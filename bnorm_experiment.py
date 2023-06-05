@@ -77,7 +77,7 @@ model_bnorm.compile(
 # Do CrossValidation
 df = pd.DataFrame(columns=['Iteration', 'Fold #', 'Raw Loss', 'BNorm Loss', 'Raw Accuracy', "BNorm Accuracy"])
 
-iterations = 1
+iterations = 50
 n_splits = 5
 epochs = 2500
 kFold = StratifiedKFold(n_splits=n_splits)
