@@ -8,7 +8,7 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
 
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import KFold
 
 import pandas as pd
 
@@ -37,50 +37,54 @@ train_x_orig, train_y, test_x_orig, test_y, classes = load_data()
 x = train_x_orig
 y = train_y
 
-# Neural network structure without Batch Normalization
-model_raw = keras.Sequential()
-model_raw.add(layers.Flatten(input_shape=(64,64,3)))
-model_raw.add(layers.Dense(units=20, input_shape=(1,12288), activation='relu'))
-model_raw.add(layers.Dense(units=7, input_shape=(1,20), activation='relu'))
-model_raw.add(layers.Dense(units=5, input_shape=(1,7), activation='relu'))
-model_raw.add(layers.Dense(units=1, input_shape=(1,5), activation='sigmoid'))
+def create_raw_model(learning_rate = 0.0075):
+    # Neural network structure without Batch Normalization
+    model_raw = keras.Sequential()
+    model_raw.add(layers.Flatten(input_shape=(64,64,3)))
+    model_raw.add(layers.Dense(units=20, input_shape=(1,12288), activation='relu'))
+    model_raw.add(layers.Dense(units=7, input_shape=(1,20), activation='relu'))
+    model_raw.add(layers.Dense(units=5, input_shape=(1,7), activation='relu'))
+    model_raw.add(layers.Dense(units=1, input_shape=(1,5), activation='sigmoid'))
 
-# Neural network structure for Batch Normalized Model
-model_bnorm = keras.Sequential()
-model_bnorm.add(layers.Flatten(input_shape=(64,64,3)))
-model_bnorm.add(layers.Dense(units=20, input_shape=(1,12288), activation='relu'))
-model_bnorm.add(layers.BatchNormalization())
-model_bnorm.add(layers.Dense(units=7, input_shape=(1,20), activation='relu'))
-model_bnorm.add(layers.BatchNormalization())
-model_bnorm.add(layers.Dense(units=5, input_shape=(1,7), activation='relu'))
-model_bnorm.add(layers.BatchNormalization())
-model_bnorm.add(layers.Dense(units=1, input_shape=(1,5), activation='sigmoid'))
+    # compile the raw model
+    model_raw.compile(
+        optimizer=keras.optimizers.SGD(learning_rate=learning_rate),
+        loss=keras.losses.BinaryCrossentropy(),
+        metrics=['accuracy']
+    )
 
+    return model_raw
 
-learning_rate = 0.0075
+def create_bnorm_model(learning_rate = 0.0075):
+    # Neural network structure for Batch Normalized Model
+    model_bnorm = keras.Sequential()
+    model_bnorm.add(layers.Flatten(input_shape=(64,64,3)))
+    model_bnorm.add(layers.Dense(units=20, input_shape=(1,12288), activation='relu'))
+    model_bnorm.add(layers.BatchNormalization())
+    model_bnorm.add(layers.Dense(units=7, input_shape=(1,20), activation='relu'))
+    model_bnorm.add(layers.BatchNormalization())
+    model_bnorm.add(layers.Dense(units=5, input_shape=(1,7), activation='relu'))
+    model_bnorm.add(layers.BatchNormalization())
+    model_bnorm.add(layers.Dense(units=1, input_shape=(1,5), activation='sigmoid'))
 
-# compile the raw model
-model_raw.compile(
-    optimizer=keras.optimizers.SGD(learning_rate=learning_rate),
-    loss=keras.losses.BinaryCrossentropy(),
-    metrics=['accuracy']
-)
+    # compile the bnorm model
+    model_bnorm.compile(
+        optimizer=keras.optimizers.SGD(learning_rate=learning_rate),
+        loss=keras.losses.BinaryCrossentropy(),
+        metrics=['accuracy']
+    )
 
-# compile the bnorm model
-model_bnorm.compile(
-    optimizer=keras.optimizers.SGD(learning_rate=learning_rate),
-    loss=keras.losses.BinaryCrossentropy(),
-    metrics=['accuracy']
-)
+    return model_bnorm
 
 
 # Do CrossValidation
 df = pd.DataFrame(columns=['Iteration', 'Fold #', 'Raw Loss', 'BNorm Loss', 'Raw Accuracy', "BNorm Accuracy"])
 
-iterations = 50
+iterations = 10
 n_splits = 5
-epochs = 2500
-kFold = StratifiedKFold(n_splits=n_splits)
+epochs = 100
+kFold = KFold(n_splits=n_splits, shuffle=True)
+
 loss_raw = np.zeros(n_splits)
 loss_bnorm = np.zeros(n_splits)
 acc_raw = np.zeros(n_splits)
@@ -88,9 +92,14 @@ acc_bnorm = np.zeros(n_splits)
 
 for iteration in range(iterations):
     idx = 0
+    print("Iteration: " + str(iteration))
     for train, test in kFold.split(x, y.T):
-        history_raw = model_raw.fit(x[train], y.T[train], epochs = epochs, batch_size = 209, validation_split = 0.2, verbose=0,)
-        history_bnorm = model_bnorm.fit(x[train], y.T[train], epochs = epochs, batch_size = 209, validation_split = 0.2, verbose=0,)
+
+        model_raw = create_raw_model()
+        model_bnorm = create_bnorm_model()
+
+        history_raw = model_raw.fit(x[train], y.T[train], epochs = epochs, batch_size = 209, verbose=0,)
+        history_bnorm = model_bnorm.fit(x[train], y.T[train], epochs = epochs, batch_size = 209, verbose=0,)
 
         loss_raw[idx] = history_raw.history['loss'][-1]
         loss_bnorm[idx] = history_bnorm.history['loss'][-1]
@@ -102,10 +111,12 @@ for iteration in range(iterations):
         acc_bnorm[idx] = bnorm_test_acc
         
         # iteration, idx+1, loss_raw, loss_bnorm, acc_raw, acc_bnorm
-        new_row  = {'Iteration': int(iteration+1), 'Fold #': int(idx+1), 'Raw Loss': loss_raw[idx], 'BNorm Loss': loss_bnorm[idx], 'Raw Accuracy': raw_test_acc, 'BNorm Accuracy': bnorm_test_acc}
+        new_row  = {'Iteration': int(iteration+1), 'Fold #': int(idx+1), 'Raw Loss': loss_raw[idx], 'BNorm Loss': loss_bnorm[idx], 'Raw Accuracy': acc_raw[idx], 'BNorm Accuracy': acc_bnorm[idx]}
         df = df.append(new_row, ignore_index = True)
         
         idx += 1
+
+        # keras.backend.clear_session()
 
     print("Raw Losses: " + str(loss_raw))
     print("Raw Losses Mean: " + str(loss_raw.mean()))
@@ -125,3 +136,10 @@ print("---------")
 print("Time: " + str(total))
 
 df.to_csv('./data.csv', index=False)
+
+# import matplotlib.pyplot as plt
+# fig, axs = plt.subplots(2)
+# axs[0].plot(5*(df['Iteration']-1) + df['Fold #'], df['Raw Accuracy'])
+# axs[1].plot(5*(df['Iteration']-1) + df['Fold #'], df['BNorm Accuracy'])
+
+# plt.savefig('test3.png')
