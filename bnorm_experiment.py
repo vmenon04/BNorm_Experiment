@@ -80,9 +80,9 @@ def create_bnorm_model(learning_rate = 0.0075):
 # Do CrossValidation
 df = pd.DataFrame(columns=['Iteration', 'Fold #', 'Raw Loss', 'BNorm Loss', 'Raw Accuracy', "BNorm Accuracy"])
 
-iterations = 10
+iterations = 50
 n_splits = 5
-epochs = 100
+epochs = 2500
 kFold = KFold(n_splits=n_splits, shuffle=True)
 
 loss_raw = np.zeros(n_splits)
