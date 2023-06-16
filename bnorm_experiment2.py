@@ -1,3 +1,7 @@
+'''
+New upgraded experimental model that has more layers
+'''
+
 import tensorflow as tf
 
 import numpy as np
@@ -7,9 +11,7 @@ from tensorflow import keras
 from tensorflow.keras import layers
 
 from sklearn.model_selection import KFold
-from sklearn.model_selection import cross_val_score
-from sklearn.metrics import make_scorer, accuracy_score, precision_score, recall_score, f1_score
-
+from sklearn.metrics import precision_score, recall_score
 
 import pandas as pd
 
@@ -38,20 +40,27 @@ train_x_orig, train_y, test_x_orig, test_y, classes = load_data()
 x = train_x_orig
 y = train_y
 
+exit()
+
 def create_raw_model(learning_rate = 0.0075):
     # Neural network structure without Batch Normalization
     model_raw = keras.Sequential()
     model_raw.add(layers.Flatten(input_shape=(64,64,3)))
-    model_raw.add(layers.Dense(units=20, input_shape=(1,12288), activation='relu'))
-    model_raw.add(layers.Dense(units=7, input_shape=(1,20), activation='relu'))
-    model_raw.add(layers.Dense(units=5, input_shape=(1,7), activation='relu'))
-    model_raw.add(layers.Dense(units=1, input_shape=(1,5), activation='sigmoid'))
+    model_raw.add(layers.Dense(units=10000, activation='tanh'))
+    model_raw.add(layers.Dense(units=5000, activation='tanh'))
+    model_raw.add(layers.Dense(units=1000, activation='tanh'))
+    model_raw.add(layers.Dense(units=500, activation='tanh'))
+    model_raw.add(layers.Dense(units=200, activation='tanh'))
+    model_raw.add(layers.Dense(units=20, activation='tanh'))
+    model_raw.add(layers.Dense(units=7, activation='tanh'))
+    model_raw.add(layers.Dense(units=5, activation='relu'))
+    model_raw.add(layers.Dense(units=1, activation='sigmoid'))
 
     # compile the raw model
     model_raw.compile(
         optimizer=keras.optimizers.SGD(learning_rate=learning_rate),
-        loss=keras.losses.BinaryCrossentropy(),
-        metrics=['accuracy']
+        loss='binary_crossentropy',
+        metrics=['acc']
     )
 
     return model_raw
@@ -60,13 +69,23 @@ def create_bnorm_model(learning_rate = 0.0075):
     # Neural network structure for Batch Normalized Model
     model_bnorm = keras.Sequential()
     model_bnorm.add(layers.Flatten(input_shape=(64,64,3)))
-    model_bnorm.add(layers.Dense(units=20, input_shape=(1,12288), activation='relu'))
+    model_bnorm.add(layers.Dense(units=10000, activation='tanh'))
     model_bnorm.add(layers.BatchNormalization())
-    model_bnorm.add(layers.Dense(units=7, input_shape=(1,20), activation='relu'))
+    model_bnorm.add(layers.Dense(units=5000, activation='tanh'))
     model_bnorm.add(layers.BatchNormalization())
-    model_bnorm.add(layers.Dense(units=5, input_shape=(1,7), activation='relu'))
+    model_bnorm.add(layers.Dense(units=1000, activation='tanh'))
     model_bnorm.add(layers.BatchNormalization())
-    model_bnorm.add(layers.Dense(units=1, input_shape=(1,5), activation='sigmoid'))
+    model_bnorm.add(layers.Dense(units=500, activation='tanh'))
+    model_bnorm.add(layers.BatchNormalization())
+    model_bnorm.add(layers.Dense(units=200, activation='tanh'))
+    model_bnorm.add(layers.BatchNormalization())
+    model_bnorm.add(layers.Dense(units=20, activation='tanh'))
+    model_bnorm.add(layers.BatchNormalization())
+    model_bnorm.add(layers.Dense(units=7, activation='tanh'))
+    model_bnorm.add(layers.BatchNormalization())
+    model_bnorm.add(layers.Dense(units=5, activation='relu'))
+    model_bnorm.add(layers.BatchNormalization())
+    model_bnorm.add(layers.Dense(units=1, activation='sigmoid'))
 
     # compile the bnorm model
     model_bnorm.compile(
@@ -79,11 +98,12 @@ def create_bnorm_model(learning_rate = 0.0075):
 
 
 # Do CrossValidation
-all_metrics_df = pd.DataFrame(columns=['Iteration', 'Fold #', 'Raw Loss', 'BNorm Loss', 'Raw Accuracy', 'BNorm Accuracy', 'Raw Precision', 'BNorm Precision', 'Raw Recall', 'BNorm Recall'])
+data = pd.DataFrame(columns=['Iteration', 'Fold #', 'Raw Loss', 'BNorm Loss', 'Raw Accuracy', 'BNorm Accuracy', 'Raw Precision', 'BNorm Precision', 'Raw Recall', 'BNorm Recall'])
 loss_acc_df = pd.DataFrame(columns=['Iteration', 'Fold #', 'Raw Loss', 'BNorm Loss', 'Raw Accuracy', 'BNorm Accuracy'])
 prec_rec_df = pd.DataFrame(columns=['Iteration', 'Fold #', 'Sample ID', 'Actual', 'Raw', 'BNorm'])
 
-iterations = 10
+
+iterations = 1
 n_splits = 5
 epochs = 2500
 kFold = KFold(n_splits=n_splits, shuffle=True)
@@ -96,6 +116,7 @@ precision_raw = np.zeros(n_splits)
 precision_bnorm = np.zeros(n_splits)
 recall_raw = np.zeros(n_splits)
 recall_bnorm = np.zeros(n_splits)
+
 
 for iteration in range(iterations):
     idx = 0
@@ -135,13 +156,14 @@ for iteration in range(iterations):
             new_row  = {'Iteration': int(iteration+1), 'Fold #': int(idx+1), 'Sample ID': test[sub_idx], 'Actual': expected_output, 'Raw': raw_output, 'BNorm': bnorm_output}
             prec_rec_df = prec_rec_df.append(new_row, ignore_index = True)
 
+
         # iteration, idx+1, loss_raw, loss_bnorm, acc_raw, acc_bnorm
         new_row  = {'Iteration': int(iteration+1), 'Fold #': int(idx+1), 'Raw Loss': loss_raw[idx], 'BNorm Loss': loss_bnorm[idx], 'Raw Accuracy': acc_raw[idx], 'BNorm Accuracy': acc_bnorm[idx]}
         loss_acc_df = loss_acc_df.append(new_row, ignore_index = True)
 
-        # iteration, idx+1, loss_raw, loss_bnorm, acc_raw, acc_bnorm
+        # iteration, idx+1, loss_raw, loss_bnorm, acc_raw, acc_bnorm, precision_raw, precision_bnorm, recall_raw, recall_bnorm
         new_row  = {'Iteration': int(iteration+1), 'Fold #': int(idx+1), 'Raw Loss': loss_raw[idx], 'BNorm Loss': loss_bnorm[idx], 'Raw Accuracy': acc_raw[idx], 'BNorm Accuracy': acc_bnorm[idx], 'Raw Precision': precision_raw[idx], 'BNorm Precision': precision_bnorm[idx], 'Raw Recall': recall_raw[idx], 'BNorm Recall': recall_bnorm[idx]}
-        all_metrics_df = all_metrics_df.append(new_row, ignore_index = True)
+        data = data.append(new_row, ignore_index = True)
         
         idx += 1
 
@@ -164,14 +186,5 @@ print("Time: " + str(total))
 
 prec_rec_df.to_csv('./prec_rec.csv', index = False)
 loss_acc_df.to_csv('./loss_acc.csv', index = False)
-all_metrics_df.to_csv('./all_metrics.csv', index = False)
+data.to_csv('./data.csv', index = False)
 
-
-
-
-# import matplotlib.pyplot as plt
-# fig, axs = plt.subplots(2)
-# axs[0].plot(5*(loss_acc_df['Iteration']-1) + loss_acc_df['Fold #'], loss_acc_df['Raw Accuracy'])
-# axs[1].plot(5*(loss_acc_df['Iteration']-1) + loss_acc_df['Fold #'], loss_acc_df['BNorm Accuracy'])
-
-# plt.savefig('test3.png')
