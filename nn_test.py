@@ -1,5 +1,8 @@
 import os
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
+
+
 
 import tensorflow as tf
 
@@ -20,12 +23,14 @@ import sys
 
 # print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
 
-layer_list = [10000,5000,1000,500,200,20]
+layer_list = [10000,5000,1000,500,200,20] # hidden layer widths
+
 num_layers = int(sys.argv[1])
+activation_type = sys.argv[2]
 
 assert num_layers <= len(layer_list), "you are asking for too many layers"
 
-print("Layers:"+str(num_layers))
+# print("Layers:"+str(num_layers))
 
 t0 = time.time()
 
@@ -55,7 +60,7 @@ def create_raw_model(learning_rate = 0.0075):
     model_raw = keras.Sequential()
     model_raw.add(layers.Flatten(input_shape=(64,64,3)))
     for i in range(num_layers):
-        model_raw.add(layers.Dense(units=layer_list[i], name='raw_dense{0}'.format(i+1), activation='relu'))
+        model_raw.add(layers.Dense(units=layer_list[i], name='raw_dense{0}'.format(i+1), activation=activation_type))
     model_raw.add(layers.Dense(units=1, name='raw_output', activation='sigmoid'))
 
     # compile the raw model
@@ -72,7 +77,7 @@ def create_bnorm_model(learning_rate = 0.0075):
     model_bnorm = keras.Sequential()
     model_bnorm.add(layers.Flatten(input_shape=(64,64,3)))
     for i in range(num_layers):
-        model_raw.add(layers.Dense(units=layer_list[i], name='bnorm_dense{0}'.format(i+1), activation='relu'))
+        model_raw.add(layers.Dense(units=layer_list[i], name='bnorm_dense{0}'.format(i+1), activation=activation_type))
         model_bnorm.add(layers.BatchNormalization(name='bnorm_bnorm{0}'.format(i+1)))
     model_bnorm.add(layers.Dense(units=1, name='bnorm_output', activation='sigmoid'))
 
@@ -86,7 +91,7 @@ def create_bnorm_model(learning_rate = 0.0075):
     return model_bnorm
 
 iterations = 1
-epochs = 2500
+epochs = 100
 n_splits = 5
 kFold = KFold(n_splits=n_splits, shuffle=True)
 
@@ -111,6 +116,7 @@ for iteration in range(iterations):
         # print("Split #" + str(idx+1))
 
         # Train and Evaluate Raw Model
+
         model_raw = create_raw_model()
         history_raw = model_raw.fit(x[train], y.T[train], epochs = epochs, batch_size = 209, verbose=0,)
         loss_raw[idx] = history_raw.history['loss'][-1]
@@ -134,7 +140,6 @@ for iteration in range(iterations):
 
         keras.backend.clear_session()
 
-
         # Write Data
         for sub_idx in range(len(test)):
             expected_output = np.squeeze(y.T[test][sub_idx])
@@ -153,6 +158,7 @@ for iteration in range(iterations):
         data = data.append(new_row, ignore_index = True)
         
         idx += 1
+
 
     # print("Raw Losses: " + str(loss_raw))
     # print("Raw Losses Mean: " + str(loss_raw.mean()))
@@ -174,7 +180,6 @@ for iteration in range(iterations):
     # print("BNorm Recall: " + str(recall_bnorm))
     # print("BNorm Recall Mean: " + str(recall_bnorm.mean()))
 
-
 t1 = time.time()
 total = t1-t0
 
@@ -182,9 +187,16 @@ a = prec_rec_df["Actual"].astype(int)
 b = prec_rec_df["Raw"].astype(int)
 c = prec_rec_df["BNorm"].astype(int)
 
-print("Raw:" + str(precision_score(a, b)) + "," + str(recall_score(a, b)))
-print("BNorm:" + str(precision_score(a, c)) + "," + str(recall_score(a, c)))
+raw_precision_score = precision_score(a, b)
+raw_recall_score = recall_score(a, b)
+bnorm_precision_score = precision_score(a, c)
+bnorm_recall_score = recall_score(a, c)
+
+print(str(num_layers) + "," + str(raw_precision_score) + "," + str(bnorm_precision_score) + "," + str(raw_recall_score) + "," + str(bnorm_recall_score))
+
+# print("Raw:" + str(precision_score(a, b)) + "," + str(recall_score(a, b)))
+# print("BNorm:" + str(precision_score(a, c)) + "," + str(recall_score(a, c)))
 
 # print("---------")
-print("Time:" + str(total))
+# print("Time:" + str(total))
 
