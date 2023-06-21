@@ -90,14 +90,15 @@ def create_bnorm_model(learning_rate = 0.0075):
 
     return model_bnorm
 
-iterations = 1
-epochs = 100
+iterations = 10
+epochs = 1500
 n_splits = 5
 kFold = KFold(n_splits=n_splits, shuffle=True)
 
 data = pd.DataFrame(columns=['Iteration', 'Fold #', 'Raw Loss', 'BNorm Loss', 'Raw Accuracy', 'BNorm Accuracy', 'Raw Precision', 'BNorm Precision', 'Raw Recall', 'BNorm Recall'])
 loss_acc_df = pd.DataFrame(columns=['Iteration', 'Fold #', 'Raw Loss', 'BNorm Loss', 'Raw Accuracy', 'BNorm Accuracy'])
 prec_rec_df = pd.DataFrame(columns=['Iteration', 'Fold #', 'Sample ID', 'Actual', 'Raw', 'BNorm'])
+time_df = pd.DataFrame(columns=['Iteration', 'Fold #', 'Raw Time', 'BNorm Time'])
 
 
 loss_raw = np.zeros(n_splits)
@@ -117,6 +118,7 @@ for iteration in range(iterations):
 
         # Train and Evaluate Raw Model
 
+        raw_start_time = time.time()
         model_raw = create_raw_model()
         history_raw = model_raw.fit(x[train], y.T[train], epochs = epochs, batch_size = 209, verbose=0,)
         loss_raw[idx] = history_raw.history['loss'][-1]
@@ -125,10 +127,13 @@ for iteration in range(iterations):
         precision_raw[idx] = precision_score(y.T[test], raw_y_pred)
         recall_raw[idx] = recall_score(y.T[test], raw_y_pred)
         _, acc_raw[idx] = model_raw.evaluate(x[test], y.T[test], verbose=0,)
-
+        raw_end_time = time.time()
+        raw_total_time = raw_end_time - raw_start_time
         keras.backend.clear_session()
 
         # Train and Evaluate BNorm Model
+
+        bnorm_start_time = time.time()
         model_bnorm = create_bnorm_model()
         history_bnorm = model_bnorm.fit(x[train], y.T[train], epochs = epochs, batch_size = 209, verbose=0,)
         loss_bnorm[idx] = history_bnorm.history['loss'][-1]
@@ -137,7 +142,8 @@ for iteration in range(iterations):
         precision_bnorm[idx] = precision_score(y.T[test], bnorm_y_pred)
         recall_bnorm[idx] = recall_score(y.T[test], bnorm_y_pred)
         _, acc_bnorm[idx] = model_bnorm.evaluate(x[test], y.T[test], verbose=0,)
-
+        bnorm_end_time = time.time()
+        bnorm_total_time = bnorm_end_time - bnorm_start_time
         keras.backend.clear_session()
 
         # Write Data
@@ -156,7 +162,10 @@ for iteration in range(iterations):
         # iteration, idx+1, loss_raw, loss_bnorm, acc_raw, acc_bnorm, precision_raw, precision_bnorm, recall_raw, recall_bnorm
         new_row  = {'Iteration': int(iteration+1), 'Fold #': int(idx+1), 'Raw Loss': loss_raw[idx], 'BNorm Loss': loss_bnorm[idx], 'Raw Accuracy': acc_raw[idx], 'BNorm Accuracy': acc_bnorm[idx], 'Raw Precision': precision_raw[idx], 'BNorm Precision': precision_bnorm[idx], 'Raw Recall': recall_raw[idx], 'BNorm Recall': recall_bnorm[idx]}
         data = data.append(new_row, ignore_index = True)
-        
+
+        new_row = {'Iteration': int(iteration+1), 'Fold #': int(idx+1), 'Raw Time': raw_total_time, 'BNorm Time': bnorm_total_time}
+        time_df = time_df.append(new_row, ignore_index = True)
+
         idx += 1
 
 
@@ -187,12 +196,15 @@ a = prec_rec_df["Actual"].astype(int)
 b = prec_rec_df["Raw"].astype(int)
 c = prec_rec_df["BNorm"].astype(int)
 
+raw_times_mean = np.mean(time_df["Raw Time"])
+bnorm_times_mean = np.mean(time_df["BNorm Time"])
+
 raw_precision_score = precision_score(a, b)
 raw_recall_score = recall_score(a, b)
 bnorm_precision_score = precision_score(a, c)
 bnorm_recall_score = recall_score(a, c)
 
-print(str(num_layers) + "," + str(raw_precision_score) + "," + str(bnorm_precision_score) + "," + str(raw_recall_score) + "," + str(bnorm_recall_score))
+print(str(num_layers) + "," + str(raw_precision_score) + "," + str(bnorm_precision_score) + "," + str(raw_recall_score) + "," + str(bnorm_recall_score) + "," +  str(raw_times_mean) + "," + str(bnorm_times_mean))
 
 # print("Raw:" + str(precision_score(a, b)) + "," + str(recall_score(a, b)))
 # print("BNorm:" + str(precision_score(a, c)) + "," + str(recall_score(a, c)))

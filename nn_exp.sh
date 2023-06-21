@@ -1,7 +1,9 @@
 #!/bin/bash
 # Iteratively runs nn_test.py after incrementing # of layers
 
-echo Layer,Raw Precision,BNorm Precision,Raw Recall,BNorm Recall > interaction_relu.csv
+total_start=`date +%s.%N`
+
+echo Layer,Raw Precision,BNorm Precision,Raw Recall,BNorm Recall,Raw Time,BNorm Time > interaction_relu.csv
 for i in {1..6}
 do
     echo Num_Layers=$i
@@ -17,7 +19,7 @@ do
 
 done
 
-echo Layer,Raw Precision,BNorm Precision,Raw Recall,BNorm Recall > interaction_tanh.csv
+echo Layer,Raw Precision,BNorm Precision,Raw Recall,BNorm Recall,Raw Time,BNorm Time > interaction_tanh.csv
 for i in {1..6}
 do
     echo Num_Layers=$i
@@ -33,7 +35,7 @@ do
 
 done
 
-echo Layer,Raw Precision,BNorm Precision,Raw Recall,BNorm Recall > interaction_sigmoid.csv
+echo Layer,Raw Precision,BNorm Precision,Raw Recall,BNorm Recall,Raw Time,BNorm Time > interaction_sigmoid.csv
 for i in {1..6}
 do
     echo Num_Layers=$i
@@ -48,3 +50,8 @@ do
     echo Time: $runtime
 
 done
+
+total_end=`date +%s.%N`
+total_runtime=$( echo "$total_end - $total_start" | bc -l )
+
+python3 notify.py "${total_runtime}"
